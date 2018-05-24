@@ -1,7 +1,3 @@
-// Copyright 2017 Gerasimos Maropoulos, ΓΜ. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package view
 
 import (
@@ -14,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 type (
@@ -24,8 +21,9 @@ type (
 		extension string
 		assetFn   func(name string) ([]byte, error) // for embedded, in combination with directory & extension
 		namesFn   func() []string                   // for embedded, in combination with directory & extension
-		reload    bool                              // if true, each time the ExecuteWriter is called the templates will be reloaded.
+		reload    bool                              // if true, each time the ExecuteWriter is called the templates will be reloaded, each ExecuteWriter waits to be finished before writing to a new one.
 		// parser configuration
+		options     []string // text options
 		left        string
 		right       string
 		layout      string
@@ -35,7 +33,6 @@ type (
 
 		//
 		middleware func(name string, contents string) (string, error)
-		mu         sync.Mutex // locks for template files loader
 		Templates  *template.Template
 		//
 	}
@@ -97,8 +94,37 @@ func (s *HTMLEngine) Binary(assetFn func(name string) ([]byte, error), namesFn f
 // Reload if setted to true the templates are reloading on each render,
 // use it when you're in development and you're boring of restarting
 // the whole app when you edit a template file.
+//
+// Note that if `true` is passed then only one `View -> ExecuteWriter` will be render each time,
+// no concurrent access across clients, use it only on development status.
+// It's good to be used side by side with the https://github.com/kataras/rizla reloader for go source files.
 func (s *HTMLEngine) Reload(developmentMode bool) *HTMLEngine {
 	s.reload = developmentMode
+	return s
+}
+
+// Option sets options for the template. Options are described by
+// strings, either a simple string or "key=value". There can be at
+// most one equals sign in an option string. If the option string
+// is unrecognized or otherwise invalid, Option panics.
+//
+// Known options:
+//
+// missingkey: Control the behavior during execution if a map is
+// indexed with a key that is not present in the map.
+//	"missingkey=default" or "missingkey=invalid"
+//		The default behavior: Do nothing and continue execution.
+//		If printed, the result of the index operation is the string
+//		"<no value>".
+//	"missingkey=zero"
+//		The operation returns the zero value for the map type's element.
+//	"missingkey=error"
+//		Execution stops immediately with an error.
+//
+func (s *HTMLEngine) Option(opt ...string) *HTMLEngine {
+	s.rmu.Lock()
+	s.options = append(s.options, opt...)
+	s.rmu.Unlock()
 	return s
 }
 
@@ -122,7 +148,7 @@ func (s *HTMLEngine) Delims(left, right string) *HTMLEngine {
 //         // mainLayout.html is inside: "./templates/layouts/".
 //
 // Note: Layout can be changed for a specific call
-// action with the option: "layout" on the Iris' context.Render function.
+// action with the option: "layout" on the iris' context.Render function.
 func (s *HTMLEngine) Layout(layoutFile string) *HTMLEngine {
 	s.layout = layoutFile
 	return s
@@ -154,11 +180,43 @@ func (s *HTMLEngine) AddFunc(funcName string, funcBody interface{}) {
 }
 
 // Load parses the templates to the engine.
-// It's alos responsible to add the necessary global functions.
+// It's also responsible to add the necessary global functions.
 //
 // Returns an error if something bad happens, user is responsible to catch it.
 func (s *HTMLEngine) Load() error {
+	// No need to make this with a complicated and "pro" way, just add lockers to the `ExecuteWriter`.
+	// if `Reload(true)` and add a note for non conc access on dev mode.
+	// atomic.StoreUint32(&s.isLoading, 1)
+	// s.rmu.Lock()
+	// defer func() {
+	// 	s.rmu.Unlock()
+	// 	atomic.StoreUint32(&s.isLoading, 0)
+	// }()
+
 	if s.assetFn != nil && s.namesFn != nil {
+		// NOT NECESSARY "fix" of https://github.com/kataras/iris/issues/784,
+		// IT'S BAD CODE WRITTEN WE KEEP HERE ONLY FOR A REMINDER
+		// for any future questions.
+		//
+		// if strings.HasPrefix(s.directory, "../") {
+		// 	// this and some more additions are fixes for https://github.com/kataras/iris/issues/784
+		// 	// however, the dev SHOULD
+		// 	// run the go-bindata command from the "$dir" parent directory
+		// 	// and just use the ./$dir in the declaration,
+		// 	// so all these fixes are not really necessary but they are here
+		// 	// for the future
+		// 	dir, err := filepath.Abs(s.directory)
+		// 	// the absolute dir here can be invalid if running from other
+		// 	// folder but we really don't care
+		// 	// when we're working with the bindata because
+		// 	// we only care for its relative directory
+		// 	// see `loadAssets` for more.
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	s.directory = dir
+		// }
+
 		// embedded
 		return s.loadAssets()
 	}
@@ -183,9 +241,7 @@ func (s *HTMLEngine) loadDirectory() error {
 
 	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if info == nil || info.IsDir() {
-
 		} else {
-
 			rel, err := filepath.Rel(dir, path)
 			if err != nil {
 				templateErr = err
@@ -203,26 +259,23 @@ func (s *HTMLEngine) loadDirectory() error {
 
 				contents := string(buf)
 
-				if err == nil {
-
-					name := filepath.ToSlash(rel)
-					tmpl := s.Templates.New(name)
-
-					if s.middleware != nil {
-						contents, err = s.middleware(name, contents)
-					}
-					if err != nil {
-						templateErr = err
-						return err
-					}
-					s.mu.Lock()
-					// Add our funcmaps.
-					if s.funcs != nil {
-						tmpl.Funcs(s.funcs)
-					}
-
-					tmpl.Funcs(emptyFuncs).Parse(contents)
-					s.mu.Unlock()
+				name := filepath.ToSlash(rel)
+				tmpl := s.Templates.New(name)
+				tmpl.Option(s.options...)
+				if s.middleware != nil {
+					contents, err = s.middleware(name, contents)
+				}
+				if err != nil {
+					templateErr = err
+					return err
+				}
+				//s.mu.Lock()
+				// Add our funcmaps.
+				_, err = tmpl.Funcs(emptyFuncs).Funcs(s.funcs).Parse(contents)
+				//s.mu.Unlock()
+				if err != nil {
+					templateErr = err
+					return err
 				}
 			}
 
@@ -252,41 +305,71 @@ func (s *HTMLEngine) loadAssets() error {
 	}
 
 	for _, path := range names {
+		// if filepath.IsAbs(virtualDirectory) {
+		// 	// fixes https://github.com/kataras/iris/issues/784
+		// 	// we take the absolute fullpath of the template file.
+		// 	pathFileAbs, err := filepath.Abs(path)
+		// 	if err != nil {
+		// 		templateErr = err
+		// 		continue
+		// 	}
+		//
+		// 	path = pathFileAbs
+		// }
+
+		// bindata may contain more files than the templates
+		// so keep that check as it's.
 		if !strings.HasPrefix(path, virtualDirectory) {
 			continue
 		}
+
 		ext := filepath.Ext(path)
+		// check if extension matches
 		if ext == virtualExtension {
 
+			// take the relative path of the path as base of
+			// virtualDirectory (the absolute path of the view engine that dev passed).
 			rel, err := filepath.Rel(virtualDirectory, path)
 			if err != nil {
 				templateErr = err
-				return err
+				continue
 			}
+
+			// // take the current working directory
+			// cpath, err := filepath.Abs(".")
+			// if err == nil {
+			// 	// set the path as relative to "path" of the current working dir.
+			// 	// fixes https://github.com/kataras/iris/issues/784
+			// 	rpath, err := filepath.Rel(cpath, path)
+			// 	// fix view: Asset  not found for path ''
+			// 	if err == nil && rpath != "" {
+			// 		path = rpath
+			// 	}
+			// }
 
 			buf, err := assetFn(path)
 			if err != nil {
-				templateErr = err
-				return err
+				templateErr = fmt.Errorf("%v for path '%s'", err, path)
+				continue
 			}
+
 			contents := string(buf)
 			name := filepath.ToSlash(rel)
+
+			// name should be the filename of the template.
 			tmpl := s.Templates.New(name)
+			tmpl.Option(s.options...)
 
 			if s.middleware != nil {
 				contents, err = s.middleware(name, contents)
-			}
-			if err != nil {
-				templateErr = err
-				return err
+				if err != nil {
+					templateErr = fmt.Errorf("%v for name '%s'", err, name)
+					continue
+				}
 			}
 
 			// Add our funcmaps.
-			if s.funcs != nil {
-				tmpl.Funcs(s.funcs)
-			}
-
-			tmpl.Funcs(emptyFuncs).Parse(contents)
+			tmpl.Funcs(emptyFuncs).Funcs(s.funcs).Parse(contents)
 		}
 	}
 	return templateErr
@@ -336,11 +419,10 @@ func (s *HTMLEngine) layoutFuncsFor(name string, binding interface{}) {
 			return template.HTML(buf.String()), err
 		},
 	}
-	s.rmu.RLock()
+
 	for k, v := range s.layoutFuncs {
 		funcs[k] = v
 	}
-	s.rmu.RUnlock()
 	if tpl := s.Templates.Lookup(name); tpl != nil {
 		tpl.Funcs(funcs)
 	}
@@ -359,10 +441,16 @@ func (s *HTMLEngine) runtimeFuncsFor(name string, binding interface{}) {
 	}
 }
 
+var zero = time.Time{}
+
 // ExecuteWriter executes a template and writes its result to the w writer.
 func (s *HTMLEngine) ExecuteWriter(w io.Writer, name string, layout string, bindingData interface{}) error {
-	// reload the templates if reload configuration field is true
+	// re-parse the templates if reload is enabled.
 	if s.reload {
+		// locks to fix #872, it's the simplest solution and the most correct,
+		// to execute writers with "wait list", one at a time.
+		s.rmu.Lock()
+		defer s.rmu.Unlock()
 		if err := s.Load(); err != nil {
 			return err
 		}

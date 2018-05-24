@@ -3,23 +3,29 @@ os:
   - linux
   - osx
 go:
-  - go1.8
+  - "go1.9"
+  - "go1.10"
 go_import_path: github.com/kataras/iris
+# we disable test caching via GOCACHE=off
+env:
+  global:
+    - GOCACHE=off
 install:
-  - go get ./...
-# install test dependencies
-#  - go get golang.org/x/tools/cmd/cover
-#  - go get -v github.com/axw/gocov
-#  - go install github.com/axw/gocov/gocov
+  - go get ./... # for iris-contrib/httpexpect, kataras/golog
 script:
- # - gocov test | gocov report
- # the result of gocov is invalid because it tests the vendor too,
- # which its tests are removed to reduce the dl size. 
- # When I'll push my internal tests to github I'll do it
- # to do the test coverage all folders except vendor.
- # For now keep it commented.
- # - cd ./_examples
- # - go get ./...
- # - go test -v -cover ./...
- # - cd ./...
+  - go test -v -cover ./...
+after_script:
+  # examples
+  - cd ./_examples
+  - go get ./...
+  - go test -v -cover ./...
+  - cd ../
+  # typescript examples
+  - cd ./typescript/_examples
+  - go get ./...
+  - go test -v -cover ./...
+  - cd ../../
+  # make sure that the _benchmarks code is working
+  - cd ./_benchmarks
+  - go get ./...
   - go test -v -cover ./...

@@ -1,7 +1,3 @@
-// Copyright 2017 Gerasimos Maropoulos, ΓΜ. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package context
 
 import (
@@ -43,7 +39,13 @@ type ResponseRecorder struct {
 	headers http.Header
 }
 
-var _ ResponseWriter = &ResponseRecorder{}
+var _ ResponseWriter = (*ResponseRecorder)(nil)
+
+// Naive returns the simple, underline and original http.ResponseWriter
+// that backends this response writer.
+func (w *ResponseRecorder) Naive() http.ResponseWriter {
+	return w.ResponseWriter.Naive()
+}
 
 // BeginRecord accepts its parent ResponseWriter and
 // prepares itself, the response recorder, to record and send response to the client.
@@ -83,7 +85,9 @@ func (w *ResponseRecorder) EndResponse() {
 // possible to maximize compatibility.
 func (w *ResponseRecorder) Write(contents []byte) (int, error) {
 	w.chunks = append(w.chunks, contents...)
-	return len(w.chunks), nil
+	// Remember that we should not return all the written length within `Write`:
+	// see https://github.com/kataras/iris/pull/931
+	return len(contents), nil
 }
 
 // Writef formats according to a format specifier and writes to the response.
@@ -187,7 +191,7 @@ func (w *ResponseRecorder) WriteTo(res ResponseWriter) {
 
 	if to, ok := res.(*ResponseRecorder); ok {
 
-		// set the status code, to is first ( probably an error >=400)
+		// set the status code, to is first ( probably an error? (context.StatusCodeNotSuccessful, defaults to < 200 || >= 400).
 		if statusCode := w.ResponseWriter.StatusCode(); statusCode == defaultStatusCode {
 			to.WriteHeader(statusCode)
 		}

@@ -1,474 +1,233 @@
-# IRIS HAS BEEN ACQUIRED
+# Iris Web Framework <a href="README_ZH.md"> <img width="20px" src="https://iris-go.com/images/flag-china.svg?v=10" /></a> <a href="README_RU.md"><img width="20px" src="https://iris-go.com/images/flag-russia.svg?v=10" /></a> <a href="README_ID.md"> <img width="20px" src="https://iris-go.com/images/flag-indonesia.svg?v=10" /></a> <a href="README_GR.md"><img width="20px" src="https://iris-go.com/images/flag-greece.svg?v=10" /></a>
 
-Iris project has been acquired by a Dubai-based startup.
- 
-Both sides agree that every related public data should remain open for at least 30 days.
+<a href="https://iris-go.com"> <img align="right" width="169px" src="https://iris-go.com/images/icon.svg?v=a" title="logo created by @merry.dii" /> </a>
 
-After the period of 30 days, company has the proprietary rights to delete or transfer this repository and all its related public data forever without any warnings.
+[![build status](https://img.shields.io/travis/kataras/iris/master.svg?style=flat-square)](https://travis-ci.org/kataras/iris)<!-- [![release](https://img.shields.io/github/release/kataras/iris.svg?style=flat-square)](https://github.com/kataras/iris/releases)--> [![report card](https://img.shields.io/badge/report%20card-a%2B-ff3333.svg?style=flat-square)](http://goreportcard.com/report/kataras/iris) [![vscode-iris](https://img.shields.io/badge/ext%20-vscode-0c77e3.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=kataras2006.iris)<!--[![github closed issues](https://img.shields.io/github/issues-closed-raw/kataras/iris.svg?style=flat-square)](https://github.com/kataras/iris/issues?q=is%3Aissue+is%3Aclosed)--> [![chat](https://img.shields.io/badge/community-%20chat-00BCD4.svg?style=flat-square)](https://kataras.rocket.chat/channel/iris) [![view examples](https://img.shields.io/badge/learn%20by-examples-0077b3.svg?style=flat-square)](https://iris-go.com/v10/recipe) [![release](https://img.shields.io/badge/release%20-v10.6-0077b3.svg?style=flat-square)](https://github.com/kataras/iris/releases)
 
-The company may or may not reveal its true identity to the public.   
+Iris is a fast, simple yet fully featured and very efficient web framework for Go.
 
-Transaction of the public domains still in-progress:
+Iris provides a beautifully expressive and easy to use foundation for your next website or API.
 
-- http://iris-go.com
-- https://kataras.rocket.chat/channel/iris
+Finally, a real expressjs equivalent for the Go Programming Language.
 
-View-accessed users can clone the current state of the project's public repositories and use without any warranties.
+Learn what [others say about Iris](#support) and [star](https://github.com/kataras/iris/stargazers) this github repository to stay [up to date](https://facebook.com/iris.framework).
 
-From now on, Original Author owns a high position to the company's table.
+## Backers
 
-At any circumstances, 
+Thank you to all our backers! 🙏 [Become a backer](https://iris-go.com/donate)
 
-Original Author keeps the creation rights.
+<a href="https://iris-go.com/donate" target="_blank"><img src="https://iris-go.com/backers.svg?v=2"/></a>
 
-# About the future of Iris
+```sh
+$ cat example.go
+```
 
-Clone the repository today because if I can't find a new lead maintainer for the [v7.2](https://github.com/kataras/iris-v7-29d) you, as community, will have to find a way to communicate about its future, the name "iris go" was taken by the company too, so it will be nice if the future main contributor change its name too, if you don't do it I will not beat you but I don't know the full company's law-plan for this, yet.
-  
-All donators, without any exception, will have my support for at least 6 months (for all iris versions), we have a private room at the [chat](https://kataras.rocket.chat/channel/iris).
+```go
+package main
 
-Don't worry **I will not let you down**, we're trying to find a decent open-source contributor to continue the Iris' open-source codebase. I'm already in touch with some good gophers but **If you're willing to maintain this project** please [send](#contact) me details about your experience, general bio and your github username.
+import "github.com/kataras/iris"
 
-**I am really thankful for all of your support to me and the community, all donations, all bug reports, all comments without any exception. I did proceeded with all my physical abilities so far but unfortunately there weren't enough for my survivor. I'm really sorry if the latest news made iris open-source community disappointed but you have to see things from my point view, I was one step before bankruptcy, I had no other choice but accept the offer.**
+func main() {
+    app := iris.New()
+    // Load all templates from the "./views" folder
+    // where extension is ".html" and parse them
+    // using the standard `html/template` package.
+    app.RegisterView(iris.HTML("./views", ".html"))
 
-# ![Logo created by @santoshanand](logo_white_35_24.png) Iris 
+    // Method:    GET
+    // Resource:  http://localhost:8080
+    app.Get("/", func(ctx iris.Context) {
+        // Bind: {{.message}} with "Hello world!"
+        ctx.ViewData("message", "Hello world!")
+        // Render template file: ./views/hello.html
+        ctx.View("hello.html")
+    })
 
+    // Method:    GET
+    // Resource:  http://localhost:8080/user/42
+    //
+    // Need to use a custom regexp instead?
+    // Easy,
+    // just mark the parameter's type to 'string'
+    // which accepts anything and make use of
+    // its `regexp` macro function, i.e:
+    // app.Get("/user/{id:string regexp(^[0-9]+$)}")
+    app.Get("/user/{id:long}", func(ctx iris.Context) {
+        userID, _ := ctx.Params().GetInt64("id")
+        ctx.Writef("User ID: %d", userID)
+    })
 
-A fast, cross-platform and efficient web framework with robust set of well-designed features, written entirely in Go.
+    // Start the server using a network address.
+    app.Run(iris.Addr(":8080"))
+}
+```
 
-[![Build status](https://api.travis-ci.org/kataras/iris.svg?branch=master&style=flat-square)](https://travis-ci.org/kataras/iris)
-[![Report card](https://img.shields.io/badge/report%20card%20-a%2B-F44336.svg?style=flat-square)](http://goreportcard.com/report/kataras/iris)
-[![Support forum](https://img.shields.io/badge/support-page-ec2eb4.svg?style=flat-square)](http://support.iris-go.com)
-[![Examples](https://img.shields.io/badge/howto-examples-3362c2.svg?style=flat-square)](https://github.com/kataras/iris/tree/master/_examples#table-of-contents)
-[![Godocs](https://img.shields.io/badge/7.2.0-%20documentation-5272B4.svg?style=flat-square)](https://godoc.org/github.com/kataras/iris)
-[![Chat](https://img.shields.io/badge/community-%20chat-00BCD4.svg?style=flat-square)](https://kataras.rocket.chat/channel/iris)
-[![Buy me a cup of coffee](https://img.shields.io/badge/support-%20open--source-F4A460.svg?logo=data:image%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDEwMDAiPjxwYXRoIGZpbGw9InJnYigyMjAsMjIwLDIyMCkiIGQ9Ik04ODYuNiwzMDUuM2MtNDUuNywyMDMuMS0xODcsMzEwLjMtNDA5LjYsMzEwLjNoLTc0LjFsLTUxLjUsMzI2LjloLTYybC0zLjIsMjEuMWMtMi4xLDE0LDguNiwyNi40LDIyLjYsMjYuNGgxNTguNWMxOC44LDAsMzQuNy0xMy42LDM3LjctMzIuMmwxLjUtOGwyOS45LTE4OS4zbDEuOS0xMC4zYzIuOS0xOC42LDE4LjktMzIuMiwzNy43LTMyLjJoMjMuNWMxNTMuNSwwLDI3My43LTYyLjQsMzA4LjktMjQyLjdDOTIxLjYsNDA2LjgsOTE2LjcsMzQ4LjYsODg2LjYsMzA1LjN6Ii8%2BPHBhdGggZmlsbD0icmdiKDIyMCwyMjAsMjIwKSIgZD0iTTc5MS45LDgzLjlDNzQ2LjUsMzIuMiw2NjQuNCwxMCw1NTkuNSwxMEgyNTVjLTIxLjQsMC0zOS44LDE1LjUtNDMuMSwzNi44TDg1LDg1MWMtMi41LDE1LjksOS44LDMwLjIsMjUuOCwzMC4ySDI5OWw0Ny4zLTI5OS42bC0xLjUsOS40YzMuMi0yMS4zLDIxLjQtMzYuOCw0Mi45LTM2LjhINDc3YzE3NS41LDAsMzEzLTcxLjIsMzUzLjItMjc3LjVjMS4yLTYuMSwyLjMtMTIuMSwzLjEtMTcuOEM4NDUuMSwxODIuOCw4MzMuMiwxMzAuOCw3OTEuOSw4My45TDc5MS45LDgzLjl6Ii8%2BPC9zdmc%2B)](https://github.com/kataras/iris#buy-me-a-cup-of-coffee)
- 
-<p>
-<img src="https://raw.githubusercontent.com/smallnest/go-web-framework-benchmark/4db507a22c964c9bc9774c5b31afdc199a0fe8b7/benchmark.png" alt="This benchmark measures results from 'real-world' instead of 'hello-world' application source code. | Last Update At: July 21, 2016. | Shows: Processing Time Horizontal Graph. | Who did:  Third-party source. Transparent achievement." />
-</p>
+> Learn more about path parameter's types by clicking [here](_examples/routing/dynamic-path/main.go#L31)
 
-Build your own web applications and portable APIs with the highest performance and countless potentials.
+```html
+<!-- file: ./views/hello.html -->
+<html>
+<head>
+    <title>Hello Page</title>
+</head>
+<body>
+    <h1>{{.message}}</h1>
+</body>
+</html>
+```
 
-If you're coming from [Node.js](https://nodejs.org) world, this is the [expressjs](https://github.com/expressjs/express)++ equivalent for the [Go Programming Language](https://golang.org).
+```sh
+$ go run example.go
+Now listening on: http://localhost:8080
+Application Started. Press CTRL+C to shut down.
+_
+```
 
+## Installation
 
-Table of contents
------------
-
-* [Installation](#installation)
-* [Feature overview](#feature-overview)
-* [Documentation](#documentation)
-    * [Examples](https://github.com/kataras/iris/tree/master/_examples)
-    * [Reload on source code changes](#reload-on-source-code-changes)
-* [Support](#support)
-    * [Buy me a cup of coffee?](#buy-me-a-cup-of-coffee)
-* [Third-party middleware list](#third-party-middleware)    
-* [Testing](#testing)
-* [Philosophy](#philosophy)
-* [People](#people)
-    * [Legends](#legends)
-    * [Contact](#contact)
-* [Versioning](#version)
-    * [When should I upgrade?](#should-i-upgrade-my-iris)
-    * [Where can I find older versions?](#where-can-i-find-older-versions)
-
-Installation
------------
-
-The only requirement is the [Go Programming Language](https://golang.org/dl/), at least version 1.8
+The only requirement is the [Go Programming Language](https://golang.org/dl/)
 
 ```sh
 $ go get -u github.com/kataras/iris
 ```
 
-> Iris uses the [vendor directory](https://docs.google.com/document/d/1Bz5-UB7g2uPBdOx-rw5t9MxJwkfpx90cqG9AFL0JAYo) feature, so you get truly reproducible builds, as this method guards against upstream renames and deletes.
-For further installation support, please navigate [here](http://support.iris-go.com/d/16-how-to-install-iris-web-framework).
+Iris takes advantage of the [vendor directory](https://docs.google.com/document/d/1Bz5-UB7g2uPBdOx-rw5t9MxJwkfpx90cqG9AFL0JAYo) feature. You get truly reproducible builds, as this method guards against upstream renames and deletes.
 
-```go
-package main
+[![Iris vs .NET Core(C#) vs Node.js (Express)](https://iris-go.com/images/benchmark-new-gray.png)](_benchmarks/README_UNIX.md)
 
-import (
-    "github.com/kataras/iris"
-    "github.com/kataras/iris/context"
-    "github.com/kataras/iris/view"
-)
+_Updated at: [Tuesday, 21 November 2017](_benchmarks/README_UNIX.md)_
 
-// User is just a bindable object structure.
-type User struct {
-    Username  string `json:"username"`
-    Firstname string `json:"firstname"`
-    Lastname  string `json:"lastname"`
-    City      string `json:"city"`
-    Age       int    `json:"age"`
-}
+<details>
+<summary>Benchmarks from third-party source over the rest web frameworks</summary>
 
-func main() {
-    app := iris.New()
-    
-    // Define templates using the std html/template engine.
-    // Parse and load all files inside "./views" folder with ".html" file extension.
-    // Reload the templates on each request (development mode).
-    app.AttachView(view.HTML("./views", ".html").Reload(true))
-    
-    // Regster custom handler for specific http errors.
-    app.OnErrorCode(iris.StatusInternalServerError, func(ctx context.Context) {
-    	// .Values are used to communicate between handlers, middleware.
-    	errMessage := ctx.Values().GetString("error")
-    	if errMessage != "" {
-    		ctx.Writef("Internal server error: %s", errMessage)
-    		return
-    	}
-    
-    	ctx.Writef("(Unexpected) internal server error")
-    })
-    
-    app.Use(func(ctx context.Context) {
-    	ctx.Application().Log("Begin request for path: %s", ctx.Path())
-    	ctx.Next()
-    })
-    
-    // app.Done(func(ctx context.Context) {})
-    
-    // Method POST: http://localhost:8080/decode
-    app.Post("/decode", func(ctx context.Context) {
-    	var user User
-    	ctx.ReadJSON(&user)
-    	ctx.Writef("%s %s is %d years old and comes from %s", user.Firstname, user.Lastname, user.Age, user.City)
-    })
-    
-    // Method GET: http://localhost:8080/encode
-    app.Get("/encode", func(ctx context.Context) {
-    	doe := User{
-    		Username:  "Johndoe",
-    		Firstname: "John",
-    		Lastname:  "Doe",
-    		City:      "Neither FBI knows!!!",
-    		Age:       25,
-    	}
-    
-    	ctx.JSON(doe)
-    })
-    
-    // Method GET: http://localhost:8080/profile/anytypeofstring
-    app.Get("/profile/{username:string}", profileByUsername)
-    
-    usersRoutes := app.Party("/users", logThisMiddleware)
-    {
-    	// Method GET: http://localhost:8080/users/42
-    	usersRoutes.Get("/{id:int min(1)}", getUserByID)
-    	// Method POST: http://localhost:8080/users/create
-    	usersRoutes.Post("/create", createUser)
-    }
-    
-    // Listen for incoming HTTP/1.x & HTTP/2 clients on localhost port 8080.
-    app.Run(iris.Addr(":8080"), iris.WithCharset("UTF-8"))
-}
+![Comparison with other frameworks](https://raw.githubusercontent.com/smallnest/go-web-framework-benchmark/4db507a22c964c9bc9774c5b31afdc199a0fe8b7/benchmark.png)
 
-func logThisMiddleware(ctx context.Context) {
-    ctx.Application().Log("Path: %s | IP: %s", ctx.Path(), ctx.RemoteAddr())
-    
-    // .Next is required to move forward to the chain of handlers,
-    // if missing then it stops the execution at this handler.
-    ctx.Next()
-}
+</details>
 
-func profileByUsername(ctx context.Context) {
-    // .Params are used to get dynamic path parameters.
-    username := ctx.Params().Get("username")
-    ctx.ViewData("Username", username)
-    // renders "./views/users/profile.html"
-    // with {{ .Username }} equals to the username dynamic path parameter.
-    ctx.View("users/profile.html")
-}
+## Support
 
-func getUserByID(ctx context.Context) {
-    userID := ctx.Params().Get("id") // Or convert directly using: .Values().GetInt/GetInt64 etc...
-    // your own db fetch here instead of user :=...
-    user := User{Username: "username" + userID}
-    
-    ctx.XML(user)
-}
+- [HISTORY](HISTORY.md#mo-21-may-2018--v1065) file is your best friend, it contains information about the latest features and changes
+- Did you happen to find a bug? Post it at [github issues](https://github.com/kataras/iris/issues)
+- Do you have any questions or need to speak with someone experienced to solve a problem at real-time? Join us to the [community chat](https://chat.iris-go.com)
+- Complete our form-based user experience report by clicking [here](https://docs.google.com/forms/d/e/1FAIpQLSdCxZXPANg_xHWil4kVAdhmh7EBBHQZ_4_xSZVDL-oCC_z5pA/viewform?usp=sf_link)
+- Do you like the framework? Tweet something about it! The People have spoken:
 
-func createUser(ctx context.Context) {
-    var user User
-    err := ctx.ReadForm(&user)
-    if err != nil {
-    	ctx.Values().Set("error", "creating user, read and parse form failed. "+err.Error())
-    	ctx.StatusCode(iris.StatusInternalServerError)
-    	return
-    }
-    // renders "./views/users/create_verification.html"
-    // with {{ . }} equals to the User object, i.e {{ .Username }} , {{ .Firstname}} etc...
-    ctx.ViewData("", user)
-    ctx.View("users/create_verification.html")
-}
-```
+<a href="https://twitter.com/gelnior/status/769100480706379776"> 
+    <img src="https://comments.iris-go.com/comment27_mini.png" width="350px">
+</a>
 
-### Reload on source code changes
+<a href="https://twitter.com/MeAlex07/status/822799954188075008"> 
+    <img src="https://comments.iris-go.com/comment28_mini.png" width="350px">
+</a>
 
-```sh
-$ go get -u github.com/kataras/rizla
-$ cd $GOPATH/src/mywebapp
-$ rizla main.go
-```
+<a href="https://twitter.com/_mgale/status/818591490305761280"> 
+    <img src="https://comments.iris-go.com/comment29_mini.png" width="350px">
+</a>
+<a href="https://twitter.com/VeayoX/status/813273328550973440"> 
+    <img src="https://comments.iris-go.com/comment30_mini.png" width="350px">
+</a>
 
-> Psst: Wanna go to [_examples](https://github.com/kataras/iris/tree/master/_examples) to see more code-snippets?
+<a href="https://twitter.com/pvsukale/status/745328224876408832"> 
+    <img src="https://comments.iris-go.com/comment31_mini.png" width="350px">
+</a>
 
-Feature Overview
------------
+<a href="https://twitter.com/blainsmith/status/745338092211560453"> 
+    <img src="https://comments.iris-go.com/comment32_mini.png" width="350px">
+</a>
 
-- Focus on high performance
-- Build RESTful APIs with our expressionist path syntax, i.e `{userid:int min(1)}`, `{asset:path}`, `{custom regexp([a-z]+)}`
-- Automatically install and serve certificates from https://letsencrypt.org
-- Robust routing and middleware ecosystem
-- Request-Scoped Transactions
-- Group API's and subdomains with wildcard support
-- Body binding for JSON, XML, Forms, can be extended to use your own custom binders
-- More than 50 handy functions to send HTTP responses
-- View system: supporting more than 6+ template engines, with prerenders. You can still use your favorite
-- Define virtual hosts and (wildcard) subdomains with path level routing
-- Graceful shutdown
-- Limit request body
-- Localization i18N
-- Serve static and embedded files
-- Cache
-- Log requests
-- Customizable format and output for the logger
-- Customizable HTTP errors
-- Compression (Gzip)
-- Authentication
- - OAuth, OAuth2 supporting 27+ popular websites
- - JWT
- - Basic Authentication
-- HTTP Sessions
-- Add / Remove trailing slash from the URL with option to redirect
-- Redirect requests
- - HTTP to HTTPS
- - HTTP to HTTPS WWW
- - HTTP to HTTPS non WWW
- - Non WWW to WWW
- - WWW to non WWW
-- Highly scalable rich content render (Markdown, JSON, JSONP, XML...)
-- Websocket-only API similar to socket.io
-- Hot Reload on source code changes
-- Typescript integration + Web IDE
-- Checks for updates at startup
-- Highly customizable
-- Feels like you used iris forever, thanks to its Fluent API
-- And many others...
+<a href="https://twitter.com/tjbyte/status/758287014210867200"> 
+    <img src="https://comments.iris-go.com/comment33_mini.png" width="350px">
+</a>
 
-Documentation
------------
+<a href="https://twitter.com/tangzero/status/751050577220698112"> 
+    <img src="https://comments.iris-go.com/comment34_mini.png" width="350px">
+</a>
 
- <a href="https://github.com/kataras/iris/tree/master/_examples#table-of-contents"><img width="155" src="https://raw.githubusercontent.com/iris-contrib/website/gh-pages/assets/book/cover_4.jpg"></a>
+<a href="https://twitter.com/tjbyte/status/758287244947972096"> 
+    <img src="https://comments.iris-go.com/comment33_2_mini.png" width="350px">
+</a>
 
-Small but practical [examples](https://github.com/kataras/iris/tree/master/_examples#table-of-contents) --they cover each feature.
+<a href="https://twitter.com/ferarias/status/902468752364773376"> 
+    <img src="https://comments.iris-go.com/comment41.png" width="350px">
+</a>
 
-Wanna create your own fast URL Shortener Service Using Iris? --click [here](https://medium.com/@kataras/a-url-shortener-service-using-go-iris-and-bolt-4182f0b00ae7) to learn how.
+<br/><br/>
 
-[Godocs](https://godoc.org/github.com/kataras/iris) --for deep understanding.
+For more information about contributing to the Iris project please check the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
+[List of all Contributors](https://github.com/kataras/iris/graphs/contributors)
 
-Support
-------------
+## Learn
 
-- [Post](http://support.iris-go.com) a feature request or report a bug, will help to make the framework even better.
-- :star: and watch [the project](https://github.com/kataras/iris/stargazers), will notify you about updates.
-- :earth_americas: publish [an article](https://medium.com/) or share a [tweet](https://twitter.com/) about Iris.
-- Donations, will help me to continue.
+First of all, the most correct way to begin with a web framework is to learn the basics of the programming language and the standard `http` capabilities, if your web application is a very simple personal project without performance and maintainability requirements you may want to proceed just with the standard packages. After that follow the guidelines:
 
-I'll be glad to talk with you about **your awesome feature requests**, 
-open a new [discussion](http://support.iris-go.com), you will be heard!
+- Navigate through **100+1** **[examples](_examples)** and some [iris starter kits](#iris-starter-kits) we crafted for you
+- Read the [godocs](https://godoc.org/github.com/kataras/iris) for any details
+- Prepare a cup of coffee or tea, whatever pleases you the most, and read some [articles](#articles) we found for you
 
-Thanks in advance!
+### Iris starter kits
 
-Buy me a cup of coffee?
-------------
-
-Iris is free and open source but developing it has taken thousands of hours of my time and a large part of my sanity. If you feel this web framework useful to you, it would go a great way to ensuring that I can afford to take the time to continue to develop it.
-
-
-I spend all my time in the construction of Iris, therefore I have no income value.
-
-Feel free to send **any** amount through paypal:
-
-[![](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=kataras2006%40hotmail%2ecom&lc=GR&item_name=Iris%20web%20framework&item_number=iriswebframeworkdonationid2016&currency_code=EUR&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted)
-
-> Please check your e-mail after your donation.
-
-Thanks for your gratitude and finance help ♡
-<!-- 
-
-Some of the benefits are listed here:
-
-- Your github username, after your approval, is visible at the top of the README page.
-- Access to the 'donors' [private chat room](https://kataras.rocket.chat/group/donors) gives you real-time assistance by Iris' Author.
-
---> 
-
-<!-- 
-
-### Become An Iris Sponsor
-
-Want to add your company's logo to our [website](http://iris-go.com)?
-
-Please contact me via email: kataras2006@hotmail.com
-
-Thank you!
-
+<!-- table form 
+| Description | Link |
+| -----------|-------------|
+| Hasura hub starter project with a ready to deploy golang helloworld webapp with IRIS! | https://hasura.io/hub/project/hasura/hello-golang-iris |
+| A basic web app built in Iris for Go |https://github.com/gauravtiwari/go_iris_app |
+| A mini social-network created with the awesome Iris💖💖 | https://github.com/iris-contrib/Iris-Mini-Social-Network |
+| Iris isomorphic react/hot reloadable/redux/css-modules starter kit | https://github.com/iris-contrib/iris-starter-kit |
+| Demo project with react using typescript and Iris | https://github.com/ionutvilie/react-ts |
+| Self-hosted Localization Management Platform built with Iris and Angular | https://github.com/iris-contrib/parrot |
+| Iris + Docker and Kubernetes | https://github.com/iris-contrib/cloud-native-go |
+| Quickstart for Iris with Nanobox | https://guides.nanobox.io/golang/iris/from-scratch |
 -->
 
-Third Party Middleware
-------------
+1. [A basic web app built in Iris for Go](https://github.com/gauravtiwari/go_iris_app)
+2. [A mini social-network created with the awesome Iris💖💖](https://github.com/iris-contrib/Iris-Mini-Social-Network)
+3. [Iris isomorphic react/hot reloadable/redux/css-modules starter kit](https://github.com/iris-contrib/iris-starter-kit)
+4. [Demo project with react using typescript and Iris](https://github.com/ionutvilie/react-ts)
+5. [Self-hosted Localization Management Platform built with Iris and Angular](https://github.com/iris-contrib/parrot)
+6. [Iris + Docker and Kubernetes](https://github.com/iris-contrib/cloud-native-go)
+7. [Quickstart for Iris with Nanobox](https://guides.nanobox.io/golang/iris/from-scratch)
+8. [A Hasura starter project with a ready to deploy Golang hello-world web app with IRIS](https://hasura.io/hub/project/hasura/hello-golang-iris)
 
-Iris has its own middleware form of `func(ctx context.Context)` but it's also compatible with all `net/http` middleware forms. See [here](https://github.com/kataras/iris/tree/master/_examples/beginner/convert-handlers).
+> Did you build something similar? Let us [know](https://github.com/kataras/iris/pulls)!
 
-I'm sure that each of you have, already, found his own favorite list but here's a small list of third-party handlers:
+### Middleware
 
-| Middleware | Author | Description |
-| -----------|--------|-------------|
-| [tollbooth](https://github.com/didip/tollbooth) | [Didip Kerabat](https://github.com/didip) | Generic middleware to rate-limit HTTP requests. [Example](https://github.com/didip/tollbooth/pull/34) |
-| [goth](https://github.com/markbates/goth) | [Mark Bates](https://github.com/markbates) | OAuth, OAuth2 authentication. [Example](https://github.com/kataras/iris/tree/master/_examples/intermediate/oauth2) |
-| [binding](https://github.com/mholt/binding) | [Matt Holt](https://github.com/mholt) | Data binding from HTTP requests into structs |
-| [cloudwatch](https://github.com/cvillecsteele/negroni-cloudwatch) | [Colin Steele](https://github.com/cvillecsteele) | AWS cloudwatch metrics middleware |
-| [csp](https://github.com/awakenetworks/csp) | [Awake Networks](https://github.com/awakenetworks) | [Content Security Policy](https://www.w3.org/TR/CSP2/) (CSP) support |
-| [delay](https://github.com/jeffbmartinez/delay) | [Jeff Martinez](https://github.com/jeffbmartinez) | Add delays/latency to endpoints. Useful when testing effects of high latency |
-| [New Relic Go Agent](https://github.com/yadvendar/negroni-newrelic-go-agent) | [Yadvendar Champawat](https://github.com/yadvendar) | Official [New Relic Go Agent](https://github.com/newrelic/go-agent) (currently in beta)  |
-| [gorelic](https://github.com/jingweno/negroni-gorelic) | [Jingwen Owen Ou](https://github.com/jingweno) | New Relic agent for Go runtime |
-| [JWT](https://github.com/iris-contrib/middleware/tree/master/jwt) | [Auth0](https://github.com/auth0) | Middleware checks for a JWT on the `Authorization` header on incoming requests and decodes it. [Example](https://github.com/iris-contrib/middleware/tree/master/jwt/_example)|
-| [logrus](https://github.com/meatballhat/negroni-logrus) | [Dan Buch](https://github.com/meatballhat) | Logrus-based logger |
-| [onthefly](https://github.com/xyproto/onthefly) | [Alexander Rødseth](https://github.com/xyproto) | Generate TinySVG, HTML and CSS on the fly |
-| [permissions2](https://github.com/xyproto/permissions2) | [Alexander Rødseth](https://github.com/xyproto) | Cookies, users and permissions |
-| [prometheus](https://github.com/zbindenren/negroni-prometheus) | [Rene Zbinden](https://github.com/zbindenren) | Easily create metrics endpoint for the [prometheus](http://prometheus.io) instrumentation tool |
-| [render](https://github.com/unrolled/render) | [Cory Jacobsen](https://github.com/unrolled) | Render JSON, XML and HTML templates |
-| [RestGate](https://github.com/pjebs/restgate) | [Prasanga Siripala](https://github.com/pjebs) | Secure authentication for REST API endpoints |
-| [secure](https://github.com/iris-contrib/middleware/tree/master/secure) | [Cory Jacobsen](https://github.com/unrolled) | Middleware that implements a few quick security wins |
-| [stats](https://github.com/thoas/stats) | [Florent Messa](https://github.com/thoas) | Store information about your web application (response time, etc.) |
-| [VanGoH](https://github.com/auroratechnologies/vangoh) | [Taylor Wrobel](https://github.com/twrobel3) | Configurable [AWS-Style](http://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html) HMAC authentication middleware |
-| [xrequestid](https://github.com/pilu/xrequestid) | [Andrea Franz](https://github.com/pilu) | Middleware that assigns a random X-Request-Id header to each request |
-| [digits](https://github.com/bamarni/digits) | [Bilal Amarni](https://github.com/bamarni) | Middleware that handles [Twitter Digits](https://get.digits.com/) authentication |
+Iris has a great collection of handlers[[1]](middleware/)[[2]](https://github.com/iris-contrib/middleware) that you can use side by side with your web apps. However you are not limited to them - you are free to use any third-party middleware that is compatible with the [net/http](https://golang.org/pkg/net/http/) package, [_examples/convert-handlers](_examples/convert-handlers) will show you the way.
 
-Feel free to put up a [PR](https://github.com/iris-contrib/middleware) your middleware!
+Iris, unlike others, is 100% compatible with the standards and that's why the majority of the big companies that adapt Go to their workflow, like a very famous US Television Network, trust Iris; it's up-to-date and it will be always aligned with the std `net/http` package which is modernized by the Go Authors on each new release of the Go Programming Language.
 
-Testing
-------------
+### Articles
 
-The `httptest` package is your way for end-to-end HTTP testing, it uses the httpexpect library created by our friend, [gavv](https://github.com/gavv).
+* [A Todo MVC Application using Iris and Vue.js](https://hackernoon.com/a-todo-mvc-application-using-iris-and-vue-js-5019ff870064)
+* [A Hasura starter project with a ready to deploy Golang hello-world web app with IRIS](https://bit.ly/2lmKaAZ)
+* [Top 6 web frameworks for Go as of 2017](https://blog.usejournal.com/top-6-web-frameworks-for-go-as-of-2017-23270e059c4b)
+* [Iris Go Framework + MongoDB](https://medium.com/go-language/iris-go-framework-mongodb-552e349eab9c)
+* [How to build a file upload form using DropzoneJS and Go](https://hackernoon.com/how-to-build-a-file-upload-form-using-dropzonejs-and-go-8fb9f258a991)
+* [How to display existing files on server using DropzoneJS and Go](https://hackernoon.com/how-to-display-existing-files-on-server-using-dropzonejs-and-go-53e24b57ba19)
+* [Iris, a modular web framework](https://medium.com/@corebreaker/iris-web-cd684b4685c7)
+* [Go vs .NET Core in terms of HTTP performance](https://medium.com/@kataras/go-vs-net-core-in-terms-of-http-performance-7535a61b67b8)
+* [Iris Go vs .NET Core Kestrel in terms of HTTP performance](https://hackernoon.com/iris-go-vs-net-core-kestrel-in-terms-of-http-performance-806195dc93d5)
+* [How to Turn an Android Device into a Web Server](https://twitter.com/ThePracticalDev/status/892022594031017988)
+* [Deploying a Iris Golang app in hasura](https://medium.com/@HasuraHQ/deploy-an-iris-golang-app-with-backend-apis-in-minutes-25a559bf530b)
+* [A URL Shortener Service using Go, Iris and Bolt](https://medium.com/@kataras/a-url-shortener-service-using-go-iris-and-bolt-4182f0b00ae7)
 
-A simple test is located to [./_examples/intermediate/httptest/main_test.go](https://github.com/kataras/iris/blob/master/_examples/intermediate/httptest/main_test.go)
+### Video Courses
 
-Philosophy
-------------
+* [Daily Coding - Web Framework Golang: Iris Framework]( https://www.youtube.com/watch?v=BmOLFQ29J3s) by WarnabiruTV, source: youtube, cost: **FREE**
+* [Tutorial Golang MVC dengan Iris Framework & Mongo DB](https://www.youtube.com/watch?v=uXiNYhJqh2I&list=PLMrwI6jIZn-1tzskocnh1pptKhVmWdcbS) (19 parts so far) by Musobar Media, source: youtube, cost: **FREE**
+* [Go/Golang 27 - Iris framework : Routage de base](https://www.youtube.com/watch?v=rQxRoN6ub78) by stephgdesign, source: youtube, cost: **FREE**
+* [Go/Golang 28 - Iris framework : Templating](https://www.youtube.com/watch?v=nOKYV073S2Y) by stephgdesignn, source: youtube, cost: **FREE**
+* [Go/Golang 29 - Iris framework : Paramètres](https://www.youtube.com/watch?v=K2FsprfXs1E) by stephgdesign, source: youtube, cost: **FREE**
+* [Go/Golang 30 - Iris framework : Les middelwares](https://www.youtube.com/watch?v=BLPy1So6bhE) by stephgdesign, source: youtube, cost: **FREE**
+* [Go/Golang 31 - Iris framework : Les sessions](https://www.youtube.com/watch?v=RnBwUrwgEZ8) by stephgdesign, source: youtube, cost: **FREE**
 
-The Iris philosophy is to provide robust tooling for HTTP, making it a great solution for single page applications, web sites, hybrids, or public HTTP APIs. Keep note that, today, iris is faster than apache+nginx itself.
+### Get hired
 
-Iris does not force you to use any specific ORM or template engine. With support for the most popular template engines, you can quickly craft your perfect application.
+There are many companies and start-ups looking for Go web developers with Iris experience as requirement, we are searching for you every day and we post those information via our [facebook page](https://www.facebook.com/iris.framework), like the page to get notified, we have already posted some of them.
 
+## License
 
-People
-------------
+Iris is licensed under the [3-Clause BSD License](LICENSE). Iris is 100% free and open-source software.
 
-The author of Iris is [@kataras](https://github.com/kataras).
-
-However the real Success of Iris belongs to you with your bug reports and feature requests that made this Framework so Unique.
-
-
-### Legends
-
-I really need to thank each one of them because they stood up[♡](https://github.com/kataras/iris#support) to keep this project alive and active.
-
-[Juan Sebastián Suárez Valencia](https://github.com/Juanses) donated 20 EUR at September 11 of 2016
-
-[Bob Lee](https://github.com/li3p) donated 20 EUR at September 16 of 2016
-
-[Celso Luiz](https://github.com/celsosz) donated 50 EUR at September 29 of 2016
-
-[Ankur Srivastava](https://github.com/ansrivas) donated 20 EUR at October 2 of 2016
-
-[Damon Zhao](https://github.com/se77en) donated 20 EUR at October 21 of 2016
-
-[exponity - consulting & digital transformation](https://github.com/exponity) donated 30 EUR at November 4 of 2016
-
-[Thomas Fritz](https://github.com/thomasfr) donated 25 EUR at Jenuary 8 of 2017
-
-[Thanos V.](http://mykonosbiennale.com/) donated 20 EUR at Jenuary 16 of 2017
-
-[George Opritescu](https://github.com/International) donated 20 EUR at February 7 of 2017
-
-[Lex Tang](https://github.com/lexrus) donated 20 EUR at February 22 of 2017
-
-[Conrad Steenberg](https://github.com/hengestone) donated 25 EUR at March 23 of 2017
-
-<p>
-
-<a href="https://medium.com/@kataras/a-url-shortener-service-using-go-iris-and-bolt-4182f0b00ae7">
-<img width="300" src="http://iris-go.com/comment28.png" />
-</a>
-
-<a href="https://twitter.com/gelnior/status/769100480706379776">
-<img width="300" src="http://iris-go.com/comment27.png" />
-</a>
-
-<br/>
-
-<a href="https://www.youtube.com/watch?v=jGx0LkuUs4A">
-<img  width="300" src="https://github.com/iris-contrib/website/raw/gh-pages/assets/gif_link_to_yt.gif" alt="What people say" />
-</a>
-
-<a href="https://www.youtube.com/watch?v=jGx0LkuUs4A">
-<img width ="300" src="https://github.com/iris-contrib/website/raw/gh-pages/assets/gif_link_to_yt2.gif" alt="What people say" />
-</a>
-
-<br/>
-
-<a href="https://twitter.com/_mgale/status/818591490305761280">
-<img width="300" width="630" src="http://iris-go.com/comment25.png" />
-</a>
-
-<a href="https://twitter.com/MeAlex07/status/822799954188075008">
-<img width="300" width="627" src="http://iris-go.com/comment26.png" />
-</a>
-
-</p>
-
-### Contact
-
-Besides the fact that we have a [community chat][Chat] for questions or reports and ideas, [stackoverflow](http://stackoverflow.com/) section for generic go+iris questions and the [iris support](http://support.iris-go.com) for bug reports and feature requests, you can also contact with me, as a person who is always open to help you:
-
-- [Twitter](https://twitter.com/MakisMaropoulos)
-- [Facebook](https://facebook.com/kataras.gopher)
-- [Linkedin](https://www.linkedin.com/in/gerasimos-maropoulos)
-
-Version
-------------
-
-Current: **7.2.0**
-
-Each new release is pushed to the master. It stays there until the next version. When a next version is released then the previous version goes to its own branch with `gopkg.in` as its import path (and its own vendor folder), in order to keep it working "for-ever".
-
-Community members can request additional features or report a bug fix for a specific iris version. 
-
-
-### Should I upgrade my Iris?
-
-Developers are not forced to use the latest Iris version, they can use any version in production, they can update at any time they want.
-
-Testers should upgrade immediately, if you're willing to use Iris in production you can wait a little more longer, transaction should be as safe as possible.
-
-### Where can I find older versions?
-
-Each Iris version is independent. Only bug fixes, Router's API and experience are kept.
-
-Previous versions can be found at [releases page](https://github.com/kataras/iris/releases).
-
-License
-------------
-
-Unless otherwise noted, the source files are distributed
-under the BSD-3-Clause License found in the [LICENSE file](LICENSE).
-
-Note that some third-party packages that you use with Iris may requires
-different license agreements.
-
-[Chat]: https://kataras.rocket.chat/channel/iris
+For any questions regarding the license please send [e-mail](mailto:kataras2006@hotmail.com?subject=Iris%20License).

@@ -1,7 +1,3 @@
-// Copyright 2017 Gerasimos Maropoulos, ΓΜ. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package context
 
 import (
@@ -25,6 +21,11 @@ func New(newFunc func() Context) *Pool {
 }
 
 // Attach changes the pool's return value Context.
+//
+// The new Context should explicitly define the `Next()`
+// and `Do(context.Handlers)` functions.
+//
+// Example: https://github.com/kataras/iris/blob/master/_examples/routing/custom-context/method-overriding/main.go
 func (c *Pool) Attach(newFunc func() Context) {
 	c.newFunc = newFunc
 }
@@ -41,5 +42,12 @@ func (c *Pool) Acquire(w http.ResponseWriter, r *http.Request) Context {
 // See Acquire.
 func (c *Pool) Release(ctx Context) {
 	ctx.EndRequest()
+	c.pool.Put(ctx)
+}
+
+// ReleaseLight will just release the object back to the pool, but the
+// clean method is caller's responsibility now, currently this is only used
+// on `SPABuilder`.
+func (c *Pool) ReleaseLight(ctx Context) {
 	c.pool.Put(ctx)
 }

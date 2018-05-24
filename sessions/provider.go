@@ -1,14 +1,8 @@
-// Copyright 2017 Gerasimos Maropoulos, ΓΜ. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package sessions
 
 import (
 	"sync"
 	"time"
-
-	"github.com/kataras/iris/core/memstore"
 )
 
 type (
@@ -16,83 +10,65 @@ type (
 	// It's the session memory manager
 	provider struct {
 		// we don't use RWMutex because all actions have read and write at the same action function.
-		// (or write to a *session's value which is race if we don't lock)
+		// (or write to a *Session's value which is race if we don't lock)
 		// narrow locks are fasters but are useless here.
-		mu        sync.Mutex
-		sessions  map[string]*session
-		databases []Database
+		mu               sync.Mutex
+		sessions         map[string]*Session
+		db               Database
+		destroyListeners []DestroyListener
 	}
 )
 
 // newProvider returns a new sessions provider
 func newProvider() *provider {
 	return &provider{
-		sessions:  make(map[string]*session, 0),
-		databases: make([]Database, 0),
+		sessions: make(map[string]*Session, 0),
+		db:       newMemDB(),
 	}
 }
 
-// RegisterDatabase adds a session database
-// a session db doesn't have write access
+// RegisterDatabase sets a session database.
 func (p *provider) RegisterDatabase(db Database) {
 	p.mu.Lock() // for any case
-	p.databases = append(p.databases, db)
+	p.db = db
 	p.mu.Unlock()
 }
 
 // newSession returns a new session from sessionid
-func (p *provider) newSession(sid string, expires time.Duration) *session {
-
-	sess := &session{
-		sid:      sid,
-		provider: p,
-		values:   p.loadSessionValuesFromDB(sid),
-		flashes:  make(map[string]*flashMessage),
+func (p *provider) newSession(sid string, expires time.Duration) *Session {
+	onExpire := func() {
+		p.Destroy(sid)
 	}
 
-	if expires > 0 { // if not unlimited life duration and no -1 (cookie remove action is based on browser's session)
-		time.AfterFunc(expires, func() {
-			// the destroy makes the check if this session is exists then or not,
-			// this is used to destroy the session from the server-side also
-			// it's good to have here for security reasons, I didn't add it on the gc function to separate its action
-			p.Destroy(sid)
-		})
+	lifetime := p.db.Acquire(sid, expires)
+
+	// simple and straight:
+	if !lifetime.IsZero() {
+		// if stored time is not zero
+		// start a timer based on the stored time, if not expired.
+		lifetime.Revive(onExpire)
+	} else {
+		// Remember:  if db not exist or it has been expired
+		// then the stored time will be zero(see loadSessionFromDB) and the values will be empty.
+		//
+		// Even if the database has an unlimited session (possible by a previous app run)
+		// priority to the "expires" is given,
+		// again if <=0 then it does nothing.
+		lifetime.Begin(expires, onExpire)
+	}
+
+	sess := &Session{
+		sid:      sid,
+		provider: p,
+		flashes:  make(map[string]*flashMessage),
+		Lifetime: lifetime,
 	}
 
 	return sess
 }
 
-// can return nil
-func (p *provider) loadSessionValuesFromDB(sid string) memstore.Store {
-	var store memstore.Store
-
-	for i, n := 0, len(p.databases); i < n; i++ {
-		if dbValues := p.databases[i].Load(sid); dbValues != nil && len(dbValues) > 0 {
-			for k, v := range dbValues {
-				store.Set(k, v)
-			}
-		}
-	}
-	return store
-}
-
-func (p *provider) updateDatabases(sid string, store memstore.Store) {
-
-	if l := store.Len(); l > 0 {
-		mapValues := make(map[string]interface{}, l)
-
-		store.Visit(func(k string, v interface{}) {
-			mapValues[k] = v
-		})
-
-		for i, n := 0, len(p.databases); i < n; i++ {
-			p.databases[i].Update(sid, mapValues)
-		}
-	}
-}
-
 // Init creates the session  and returns it
-func (p *provider) Init(sid string, expires time.Duration) Session {
+func (p *provider) Init(sid string, expires time.Duration) *Session {
 	newSession := p.newSession(sid, expires)
 	p.mu.Lock()
 	p.sessions[sid] = newSession
@@ -100,17 +76,50 @@ func (p *provider) Init(sid string, expires time.Duration) Session {
 	return newSession
 }
 
+// UpdateExpiration update expire date of a session.
+// if expires > 0 then it updates the destroy task.
+// if expires <=0 then it does nothing, to destroy a session call the `Destroy` func instead.
+func (p *provider) UpdateExpiration(sid string, expires time.Duration) bool {
+	if expires <= 0 {
+		return false
+	}
+
+	p.mu.Lock()
+	sess, found := p.sessions[sid]
+	p.mu.Unlock()
+	if !found {
+		return false
+	}
+
+	sess.Lifetime.Shift(expires)
+	return true
+}
+
 // Read returns the store which sid parameter belongs
-func (p *provider) Read(sid string, expires time.Duration) Session {
+func (p *provider) Read(sid string, expires time.Duration) *Session {
 	p.mu.Lock()
 	if sess, found := p.sessions[sid]; found {
 		sess.runFlashGC() // run the flash messages GC, new request here of existing session
 		p.mu.Unlock()
+
 		return sess
 	}
 	p.mu.Unlock()
-	return p.Init(sid, expires) // if not found create new
 
+	return p.Init(sid, expires) // if not found create new
+}
+
+func (p *provider) registerDestroyListener(ln DestroyListener) {
+	if ln == nil {
+		return
+	}
+	p.destroyListeners = append(p.destroyListeners, ln)
+}
+
+func (p *provider) fireDestroy(sid string) {
+	for _, ln := range p.destroyListeners {
+		ln(sid)
+	}
 }
 
 // Destroy destroys the session, removes all sessions and flash values,
@@ -119,13 +128,9 @@ func (p *provider) Read(sid string, expires time.Duration) Session {
 func (p *provider) Destroy(sid string) {
 	p.mu.Lock()
 	if sess, found := p.sessions[sid]; found {
-		sess.values = nil
-		sess.flashes = nil
-		delete(p.sessions, sid)
-		p.updateDatabases(sid, nil)
+		p.deleteSession(sess)
 	}
 	p.mu.Unlock()
-
 }
 
 // DestroyAll removes all sessions
@@ -134,9 +139,15 @@ func (p *provider) Destroy(sid string) {
 func (p *provider) DestroyAll() {
 	p.mu.Lock()
 	for _, sess := range p.sessions {
-		delete(p.sessions, sess.ID())
-		p.updateDatabases(sess.ID(), nil)
+		p.deleteSession(sess)
 	}
 	p.mu.Unlock()
+}
 
+func (p *provider) deleteSession(sess *Session) {
+	sid := sess.sid
+
+	delete(p.sessions, sid)
+	p.db.Release(sid)
+	p.fireDestroy(sid)
 }

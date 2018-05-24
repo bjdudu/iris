@@ -1,7 +1,3 @@
-// Copyright 2017 Gerasimos Maropoulos, ΓΜ. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package context
 
 // TransactionErrResult could be named also something like 'MaybeError',
@@ -24,7 +20,7 @@ func (err TransactionErrResult) Error() string {
 
 // IsFailure returns true if this is an actual error
 func (err TransactionErrResult) IsFailure() bool {
-	return err.StatusCode >= 400
+	return StatusCodeNotSuccessful(err.StatusCode)
 }
 
 // NewTransactionErrResult returns a new transaction result with the given error message,
@@ -105,7 +101,7 @@ func (t *Transaction) Complete(err error) {
 	if err != nil {
 		t.hasError = true
 
-		statusCode := 504 // bad request
+		statusCode := 400 // bad request
 		reason := err.Error()
 		cType := "text/plain; charset=" + t.context.Application().ConfigurationReadOnly().GetCharset()
 
@@ -118,7 +114,7 @@ func (t *Transaction) Complete(err error) {
 				reason = errWstatus.Reason
 			}
 			// get the content type used on this transaction
-			if cTypeH := t.context.ResponseWriter().Header().Get(contentTypeHeaderKey); cTypeH != "" {
+			if cTypeH := t.context.ResponseWriter().Header().Get(ContentTypeHeaderKey); cTypeH != "" {
 				cType = cTypeH
 			}
 

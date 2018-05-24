@@ -1,7 +1,3 @@
-// Copyright 2017 Gerasimos Maropoulos, ΓΜ. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package host
 
 import (
@@ -9,32 +5,48 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
+	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
+	"time"
+
+	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/kataras/iris/core/errors"
-	"github.com/kataras/iris/core/nettools"
-	"golang.org/x/crypto/acme/autocert"
+	"github.com/kataras/iris/core/netutil"
 )
+
+// Configurator provides an easy way to modify
+// the Supervisor.
+//
+// Look the `Configure` func for more.
+type Configurator func(su *Supervisor)
 
 // Supervisor is the wrapper and the manager for a compatible server
 // and it's relative actions, called Tasks.
 //
 // Interfaces are separated to return relative functionality to them.
 type Supervisor struct {
-	Scheduler
-	server         *http.Server
+	Server         *http.Server
 	closedManually int32 // future use, accessed atomically (non-zero means we've called the Shutdown)
-
-	shouldWait   int32 // non-zero means that the host should wait for unblocking
-	unblockChan  chan struct{}
-	shutdownChan chan struct{}
-	errChan      chan error
+	manuallyTLS    bool  // we need that in order to determinate what to output on the console before the server begin.
+	shouldWait     int32 // non-zero means that the host should wait for unblocking
+	unblockChan    chan struct{}
 
 	mu sync.Mutex
+
+	onServe []func(TaskHost)
+	// IgnoreErrors should contains the errors that should be ignored
+	// on both serve functions return statements and error handlers.
+	//
+	// i.e: http.ErrServerClosed.Error().
+	//
+	// Note that this will match the string value instead of the equality of the type's variables.
+	//
+	// Defaults to empty.
+	IgnoredErrors []string
+	onErr         []func(error)
+	onShutdown    []func()
 }
 
 // New returns a new host supervisor
@@ -46,11 +58,25 @@ type Supervisor struct {
 // to return and exit and restore the flow too.
 func New(srv *http.Server) *Supervisor {
 	return &Supervisor{
-		server:       srv,
-		unblockChan:  make(chan struct{}, 1),
-		shutdownChan: make(chan struct{}),
-		errChan:      make(chan error),
+		Server:      srv,
+		unblockChan: make(chan struct{}, 1),
 	}
+}
+
+// Configure accepts one or more `Configurator`.
+// With this function you can use simple functions
+// that are spread across your app to modify
+// the supervisor, these Configurators can be
+// used on any Supervisor instance.
+//
+// Look `Configurator` too.
+//
+// Returns itself.
+func (su *Supervisor) Configure(configurators ...Configurator) *Supervisor {
+	for _, conf := range configurators {
+		conf(su)
+	}
+	return su
 }
 
 // DeferFlow defers the flow of the exeuction,
@@ -83,78 +109,85 @@ func (su *Supervisor) isWaiting() bool {
 	return atomic.LoadInt32(&su.shouldWait) != 0
 }
 
-// Done is being received when in server Shutdown.
-// This can be used to gracefully shutdown connections that have
-// undergone NPN/ALPN protocol upgrade or that have been hijacked.
-// This function should start protocol-specific graceful shutdown,
-// but should not wait for shutdown to complete.
-func (su *Supervisor) Done() <-chan struct{} {
-	return su.shutdownChan
+func (su *Supervisor) newListener() (net.Listener, error) {
+	// this will not work on "unix" as network
+	// because UNIX doesn't supports the kind of
+	// restarts we may want for the server.
+	//
+	// User still be able to call .Serve instead.
+	l, err := netutil.TCPKeepAlive(su.Server.Addr)
+	if err != nil {
+		return nil, err
+	}
+
+	// here we can check for sure, without the need of the supervisor's `manuallyTLS` field.
+	if netutil.IsTLS(su.Server) {
+		// means tls
+		tlsl := tls.NewListener(l, su.Server.TLSConfig)
+		return tlsl, nil
+	}
+
+	return l, nil
 }
 
-// Err refences to the return value of Server's .Serve, not the server's specific error logger.
-func (su *Supervisor) Err() <-chan error {
-	return su.errChan
+// RegisterOnError registers a function to call when errors occurred by the underline http server.
+func (su *Supervisor) RegisterOnError(cb func(error)) {
+	su.mu.Lock()
+	su.onErr = append(su.onErr, cb)
+	su.mu.Unlock()
 }
 
-func (su *Supervisor) notifyShutdown() {
-	go func() {
-		su.shutdownChan <- struct{}{}
-	}()
+func (su *Supervisor) validateErr(err error) error {
+	if err == nil {
+		return nil
+	}
 
-	su.Scheduler.notifyShutdown()
+	su.mu.Lock()
+	defer su.mu.Unlock()
+
+	for _, e := range su.IgnoredErrors {
+		if err.Error() == e {
+			return nil
+		}
+	}
+	return err
 }
 
 func (su *Supervisor) notifyErr(err error) {
-	// if err == http.ErrServerClosed {
-	// 	return
-	// }
-
-	go func() {
-		su.errChan <- err
-	}()
-
-	su.Scheduler.notifyErr(err)
+	err = su.validateErr(err)
+	if err != nil {
+		su.mu.Lock()
+		for _, f := range su.onErr {
+			go f(err)
+		}
+		su.mu.Unlock()
+	}
 }
 
-/// TODO:
+// RegisterOnServe registers a function to call on
+// Serve/ListenAndServe/ListenAndServeTLS/ListenAndServeAutoTLS.
+func (su *Supervisor) RegisterOnServe(cb func(TaskHost)) {
+	su.mu.Lock()
+	su.onServe = append(su.onServe, cb)
+	su.mu.Unlock()
+}
+
+func (su *Supervisor) notifyServe(host TaskHost) {
+	su.mu.Lock()
+	for _, f := range su.onServe {
+		go f(host)
+	}
+	su.mu.Unlock()
+}
+
 // Remove all channels, do it with events
 // or with channels but with a different channel on each task proc
 // I don't know channels are not so safe, when go func and race risk..
 // so better with callbacks....
 func (su *Supervisor) supervise(blockFunc func() error) error {
-	// println("Running Serve from Supervisor")
-
-	// su.server: in order to Serve and Shutdown the underline server and no re-run the supervisors when .Shutdown -> .Serve.
-	// su.GetBlocker: set the Block() and Unblock(), which are checked after a shutdown or error.
-	// su.GetNotifier: only one supervisor is allowed to be notified about Close/Shutdown and Err.
-	// su.log: set this builder's logger in order to supervisor to be able to share a common logger.
 	host := createTaskHost(su)
-	// run the list of supervisors in different go-tasks by-design.
-	su.Scheduler.runOnServe(host)
 
-	if len(su.Scheduler.onInterruptTasks) > 0 {
-		// this can't be moved to the task interrupt's `Run` function
-		// because it will not catch more than one ctrl/cmd+c, so
-		// we do it here. These tasks are canceled already too.
-		go func() {
-			ch := make(chan os.Signal, 1)
-			signal.Notify(ch,
-				// kill -SIGINT XXXX or Ctrl+c
-				os.Interrupt,
-				syscall.SIGINT, // register that too, it should be ok
-				// os.Kill  is equivalent with the syscall.SIGKILL
-				os.Kill,
-				syscall.SIGKILL, // register that too, it should be ok
-				// kill -SIGTERM XXXX
-				syscall.SIGTERM,
-			)
-			select {
-			case <-ch:
-				su.Scheduler.runOnInterrupt(host)
-			}
-		}()
-	}
+	su.notifyServe(host)
 
 	err := blockFunc()
 	su.notifyErr(err)
@@ -169,27 +202,7 @@ func (su *Supervisor) supervise(blockFunc func() error) error {
 		}
 	}
 
-	return err // start the server
-}
-
-func (su *Supervisor) newListener() (net.Listener, error) {
-	// this will not work on "unix" as network
-	// because UNIX doesn't supports the kind of
-	// restarts we may want for the server.
-	//
-	// User still be able to call .Serve instead.
-	l, err := nettools.TCPKeepAlive(su.server.Addr)
-	if err != nil {
-		return nil, err
-	}
-
-	if nettools.IsTLS(su.server) {
-		// means tls
-		tlsl := tls.NewListener(l, su.server.TLSConfig)
-		return tlsl, nil
-	}
-
-	return l, nil
+	return su.validateErr(err)
 }
 
 // Serve accepts incoming connections on the Listener l, creating a
@@ -204,7 +217,7 @@ func (su *Supervisor) newListener() (net.Listener, error) {
 // Serve always returns a non-nil error. After Shutdown or Close, the
 // returned error is http.ErrServerClosed.
 func (su *Supervisor) Serve(l net.Listener) error {
-	return su.supervise(func() error { return su.server.Serve(l) })
+	return su.supervise(func() error { return su.Server.Serve(l) })
 }
 
 // ListenAndServe listens on the TCP network address addr
@@ -219,45 +232,138 @@ func (su *Supervisor) ListenAndServe() error {
 	return su.Serve(l)
 }
 
-func setupHTTP2(cfg *tls.Config) {
-	cfg.NextProtos = append(cfg.NextProtos, "h2") // HTTP2
-}
-
 // ListenAndServeTLS acts identically to ListenAndServe, except that it
 // expects HTTPS connections. Additionally, files containing a certificate and
 // matching private key for the server must be provided. If the certificate
 // is signed by a certificate authority, the certFile should be the concatenation
 // of the server's certificate, any intermediates, and the CA's certificate.
 func (su *Supervisor) ListenAndServeTLS(certFile string, keyFile string) error {
-	if certFile == "" || keyFile == "" {
+	su.manuallyTLS = true
+
+	if certFile != "" && keyFile != "" {
+		cfg := new(tls.Config)
+		var err error
+		cfg.Certificates = make([]tls.Certificate, 1)
+		if cfg.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile); err != nil {
+			return err
+		}
+
+		// manually inserted as pre-go 1.9 for any case.
+		cfg.NextProtos = []string{"h2", "http/1.1"}
+		su.Server.TLSConfig = cfg
+
+		// It does nothing more than the su.Server.ListenAndServeTLS anymore.
+		// - no hurt if we let it as it is
+		// - no problem if we remove it as well
+		// but let's comment this as proposed, fewer code is better:
+		// return su.ListenAndServe()
+	}
+
+	if su.Server.TLSConfig == nil {
 		return errors.New("certFile or keyFile missing")
 	}
-	cfg := new(tls.Config)
-	var err error
-	cfg.Certificates = make([]tls.Certificate, 1)
-	if cfg.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile); err != nil {
-		return err
-	}
 
-	setupHTTP2(cfg)
-	su.server.TLSConfig = cfg
-
-	return su.ListenAndServe()
+	return su.supervise(func() error { return su.Server.ListenAndServeTLS("", "") })
 }
 
 // ListenAndServeAutoTLS acts identically to ListenAndServe, except that it
-// expects HTTPS connections. server's certificates are auto generated from LETSENCRYPT using
+// expects HTTPS connections. Server's certificates are auto generated from LETSENCRYPT using
 // the golang/x/net/autocert package.
-func (su *Supervisor) ListenAndServeAutoTLS() error {
-	autoTLSManager := autocert.Manager{
-		Prompt: autocert.AcceptTOS,
+//
+// The whitelisted domains are separated by whitespace in "domain" argument, i.e "iris-go.com".
+// If empty, all hosts are currently allowed. This is not recommended,
+// as it opens a potential attack where clients connect to a server
+// by IP address and pretend to be asking for an incorrect host name.
+// Manager will attempt to obtain a certificate for that host, incorrectly,
+// eventually reaching the CA's rate limit for certificate requests
+// and making it impossible to obtain actual certificates.
+//
+// For an "e-mail" use a non-public one, letsencrypt needs that for your own security.
+//
+// The "cacheDir" is being, optionally, used to provide cache
+// stores and retrieves previously-obtained certificates.
+// If empty, certs will only be cached for the lifetime of the auto tls manager.
+//
+// Note: The domain should be like "iris-go.com www.iris-go.com",
+// the e-mail like "kataras2006@hotmail.com" and the cacheDir like "letscache"
+// The `ListenAndServeAutoTLS` will start a new server for you,
+// which will redirect all http versions to their https, including subdomains as well.
+func (su *Supervisor) ListenAndServeAutoTLS(domain string, email string, cacheDir string) error {
+	var (
+		cache      autocert.Cache
+		hostPolicy autocert.HostPolicy
+	)
+
+	if cacheDir != "" {
+		cache = autocert.DirCache(cacheDir)
 	}
 
-	cfg := new(tls.Config)
-	cfg.GetCertificate = autoTLSManager.GetCertificate
-	setupHTTP2(cfg)
-	su.server.TLSConfig = cfg
-	return su.ListenAndServe()
+	if domain != "" {
+		domains := strings.Split(domain, " ")
+		hostPolicy = autocert.HostWhitelist(domains...)
+	}
+
+	autoTLSManager := &autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: hostPolicy,
+		Email:      email,
+		Cache:      cache,
+		ForceRSA:   true,
+	}
+
+	srv2 := &http.Server{
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		Addr:         ":http",
+		Handler:      autoTLSManager.HTTPHandler(nil), // nil for redirect.
+	}
+
+	// register a shutdown callback to this
+	// supervisor in order to close the "secondary redirect server" as well.
+	su.RegisterOnShutdown(func() {
+		// give it some time to close itself...
+		timeout := 5 * time.Second
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		srv2.Shutdown(ctx)
+	})
+	go srv2.ListenAndServe()
+
+	su.Server.TLSConfig = &tls.Config{
+		MinVersion:               tls.VersionTLS10,
+		GetCertificate:           autoTLSManager.GetCertificate,
+		PreferServerCipherSuites: true,
+		// Keep the defaults.
+		CurvePreferences: []tls.CurveID{
+			tls.X25519,
+			tls.CurveP256,
+			tls.CurveP384,
+			tls.CurveP521,
+		},
+	}
+	return su.ListenAndServeTLS("", "")
+}
+
+// RegisterOnShutdown registers a function to call on Shutdown.
+// This can be used to gracefully shutdown connections that have
+// undergone NPN/ALPN protocol upgrade or that have been hijacked.
+// This function should start protocol-specific graceful shutdown,
+// but should not wait for shutdown to complete.
+func (su *Supervisor) RegisterOnShutdown(cb func()) {
+	// when go1.9: replace the following lines with su.Server.RegisterOnShutdown(f)
+	su.mu.Lock()
+	su.onShutdown = append(su.onShutdown, cb)
+	su.mu.Unlock()
+}
+
+func (su *Supervisor) notifyShutdown() {
+	// when go1.9: remove the lines below
+	su.mu.Lock()
+	for _, f := range su.onShutdown {
+		go f()
+	}
+	su.mu.Unlock()
+	// end
 }
 
 // Shutdown gracefully shuts down the server without interrupting any
@@ -272,9 +378,7 @@ func (su *Supervisor) ListenAndServeAutoTLS() error {
 // separately notify such long-lived connections of shutdown and wait
 // for them to close, if desired.
 func (su *Supervisor) Shutdown(ctx context.Context) error {
-	// println("Running Shutdown from Supervisor")
-
 	atomic.AddInt32(&su.closedManually, 1) // future-use
 	su.notifyShutdown()
-	return su.server.Shutdown(ctx)
+	return su.Server.Shutdown(ctx)
 }

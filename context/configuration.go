@@ -1,7 +1,3 @@
-// Copyright 2017 Gerasimos Maropoulos, ΓΜ. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package context
 
 // ConfigurationReadOnly can be implemented
@@ -27,6 +23,10 @@ type ConfigurationReadOnly interface {
 	// GetEnablePathEscape is the configuration.EnablePathEscape,
 	// returns true when its escapes the path, the named parameters (if any).
 	GetEnablePathEscape() bool
+
+	// GetEnableOptimizations returns whether
+	// the application has performance optimizations enabled.
+	GetEnableOptimizations() bool
 
 	// GetFireMethodNotAllowed returns the configuration.FireMethodNotAllowed.
 	GetFireMethodNotAllowed() bool
@@ -54,6 +54,14 @@ type ConfigurationReadOnly interface {
 	// used for templates and the rest of the responses.
 	GetCharset() string
 
+	// GetPostMaxMemory returns the maximum configured post data size
+	// that a client can send to the server, this differs
+	// from the overral request body size which can be modified
+	// by the `context#SetMaxRequestBodySize` or `iris#LimitRequestBodySize`.
+	//
+	// Defaults to 32MB or 32 << 20 if you prefer.
+	GetPostMaxMemory() int64
+
 	// GetTranslateLanguageContextKey returns the configuration's TranslateFunctionContextKey value,
 	// used for i18n.
 	GetTranslateFunctionContextKey() string
@@ -71,6 +79,17 @@ type ConfigurationReadOnly interface {
 	// which is being used to set the template
 	// binding data from a middleware or the main handler.
 	GetViewDataContextKey() string
+
+	// GetRemoteAddrHeaders returns the allowed request headers names
+	// that can be valid to parse the client's IP based on.
+	//
+	// Defaults to:
+	// "X-Real-Ip":             true,
+	// "X-Forwarded-For":       true,
+	// "CF-Connecting-IP": false
+	//
+	// Look `context.RemoteAddr()` for more.
+	GetRemoteAddrHeaders() map[string]bool
 
 	// GetOther returns the configuration.Other map.
 	GetOther() map[string]interface{}

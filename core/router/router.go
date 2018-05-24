@@ -1,7 +1,3 @@
-// Copyright 2017 Gerasimos Maropoulos, ΓΜ. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package router
 
 import (
@@ -87,7 +83,7 @@ func (router *Router) BuildRouter(cPool *context.Pool, requestHandler RequestHan
 // be aware to change the global variables of 'ParamStart' and 'ParamWildcardStart'.
 // can be used to implement a custom proxy or
 // a custom router which should work with raw ResponseWriter, *Request
-// instead of the Context(which agaiin, can be retrieved by the Cramework's context pool).
+// instead of the Context(which again, can be retrieved by the Framework's context pool).
 //
 // Note: Downgrade will by-pass the Wrapper, the caller is responsible for everything.
 // Downgrade is thread-safe.
@@ -118,12 +114,12 @@ type WrapperFunc func(w http.ResponseWriter, r *http.Request, firstNextIsTheRout
 //
 // Before build.
 func (router *Router) WrapRouter(wrapperFunc WrapperFunc) {
-	router.mu.Lock()
-	defer router.mu.Unlock()
-
 	if wrapperFunc == nil {
 		return
 	}
+
+	router.mu.Lock()
+	defer router.mu.Unlock()
 
 	if router.wrapperFunc != nil {
 		// wrap into one function, from bottom to top, end to begin.
@@ -149,6 +145,12 @@ func (router *Router) ServeHTTPC(ctx context.Context) {
 
 func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	router.mainHandler(w, r)
+}
+
+// RouteExists reports whether a particular route exists
+// It will search from the current subdomain of context's host, if not inside the root domain.
+func (router *Router) RouteExists(ctx context.Context, method, path string) bool {
+	return router.requestHandler.RouteExists(ctx, method, path)
 }
 
 type wrapper struct {

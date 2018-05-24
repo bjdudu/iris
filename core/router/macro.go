@@ -1,7 +1,3 @@
-// Copyright 2017 Gerasimos Maropoulos, ΓΜ. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package router
 
 import (
@@ -40,6 +36,7 @@ func registerBuiltinsMacroFuncs(out *macro.Map) {
 	// these can be overridden by the user, later on.
 	registerStringMacroFuncs(out.String)
 	registerIntMacroFuncs(out.Int)
+	registerIntMacroFuncs(out.Long)
 	registerAlphabeticalMacroFuncs(out.Alphabetical)
 	registerFileMacroFuncs(out.File)
 	registerPathMacroFuncs(out.Path)

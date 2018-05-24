@@ -1,14 +1,16 @@
-// Package i18n provides internalization and localization via middleware. See _examples/intermediate/i18n
+// Package i18n provides internalization and localization via middleware.
+// See _examples/miscellaneous/i18n
 package i18n
 
 import (
 	"reflect"
 	"strings"
 
-	"github.com/Unknwon/i18n"
+	"github.com/iris-contrib/i18n"
 	"github.com/kataras/iris/context"
 )
 
+// test file: ../../_examples/miscellaneous/i18n/main_test.go
 type i18nMiddleware struct {
 	config Config
 }
@@ -20,10 +22,10 @@ func (i *i18nMiddleware) ServeHTTP(ctx context.Context) {
 	language := i.config.Default
 
 	langKey := ctx.Application().ConfigurationReadOnly().GetTranslateLanguageContextKey()
-	if ctx.Values().GetString(langKey) == "" {
+	language = ctx.Values().GetString(langKey)
+	if language == "" {
 		// try to get by url parameter
 		language = ctx.URLParam(i.config.URLParameter)
-
 		if language == "" {
 			// then try to take the lang field from the cookie
 			language = ctx.GetCookie(langKey)
@@ -31,9 +33,16 @@ func (i *i18nMiddleware) ServeHTTP(ctx context.Context) {
 			if len(language) > 0 {
 				wasByCookie = true
 			} else {
-				// try to get by the request headers(?)
-				if langHeader := ctx.GetHeader("Accept-Language"); i18n.IsExist(langHeader) {
-					language = langHeader
+				// try to get by the request headers.
+				langHeader := ctx.GetHeader("Accept-Language")
+				if len(langHeader) > 0 {
+					for _, langEntry := range strings.Split(langHeader, ",") {
+						lc := strings.Split(langEntry, ";")[0]
+						if lc, ok := i18n.IsExistSimilar(lc); ok {
+							language = lc
+							break
+						}
+					}
 				}
 			}
 		}
@@ -44,9 +53,17 @@ func (i *i18nMiddleware) ServeHTTP(ctx context.Context) {
 		if language == "" {
 			language = i.config.Default
 		}
+
 		ctx.Values().Set(langKey, language)
 	}
 	locale := i18n.Locale{Lang: language}
+
+	// if unexpected language given, the middleware will  transtlate to the default language, the language key should be
+	// also this language instead of the user-given
+	if indexLang := locale.Index(); indexLang == -1 {
+		locale.Lang = i.config.Default
+	}
+
 	translateFuncKey := ctx.Application().ConfigurationReadOnly().GetTranslateFunctionContextKey()
 	ctx.Values().Set(translateFuncKey, locale.Tr)
 	ctx.Next()
@@ -67,19 +84,26 @@ func New(c Config) context.Handler {
 	i := &i18nMiddleware{config: c}
 	firstlanguage := ""
 	//load the files
-	for k, v := range c.Languages {
-		if !strings.HasSuffix(v, ".ini") {
-			v += ".ini"
-		}
-		err := i18n.SetMessage(k, v)
-		if err != nil && err != i18n.ErrLangAlreadyExist {
-			panic("Iris i18n Middleware: Failed to set locale file" + k + " Error:" + err.Error())
-		}
-		if firstlanguage == "" {
-			firstlanguage = k
+	for k, langFileOrFiles := range c.Languages {
+		// remove all spaces.
+		langFileOrFiles = strings.Replace(langFileOrFiles, " ", "", -1)
+		// note: if only one, then the first element is the "v".
+		languages := strings.Split(langFileOrFiles, ",")
+
+		for _, v := range languages { // loop each of the files separated by comma, if any.
+			if !strings.HasSuffix(v, ".ini") {
+				v += ".ini"
+			}
+			err := i18n.SetMessage(k, v)
+			if err != nil && err != i18n.ErrLangAlreadyExist {
+				panic("Failed to set locale file'" + k + "' Error:" + err.Error())
+			}
+			if firstlanguage == "" {
+				firstlanguage = k
+			}
 		}
 	}
-	// if not default language setted then set to the first of the i.options.Languages
+	// if not default language setted then set to the first of the i.config.Languages
 	if c.Default == "" {
 		c.Default = firstlanguage
 	}
@@ -88,8 +112,8 @@ func New(c Config) context.Handler {
 	return i.ServeHTTP
 }
 
-// TranslatedMap returns translated map[string]interface{} from i18n structure
-func TranslatedMap(sourceInterface interface{}, ctx context.Context) map[string]interface{} {
+// TranslatedMap returns translated map[string]interface{} from i18n structure.
+func TranslatedMap(ctx context.Context, sourceInterface interface{}) map[string]interface{} {
 	iType := reflect.TypeOf(sourceInterface).Elem()
 	result := make(map[string]interface{})
 

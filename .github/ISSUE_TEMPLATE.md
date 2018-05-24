@@ -1,5 +1,11 @@
-**Do not create** issues or proposals neither request features **here**.
+Examples for the Iris project can be found at
+<https://github.com/kataras/iris/tree/master/_examples>.
 
-Navigate to the https://github.com/iris-contrib/community-board instead.
+Documentation for the Iris project can be found at
+<https://godoc.org/github.com/kataras/iris>.
 
-[FAQ](https://github.com/iris-contrib/community-board#community-board)
+Love iris? Please consider supporting the project:
+👉  https://iris-go.com/donate
+
+Care to be part of a larger community? Fill our user experience form:
+👉  https://goo.gl/forms/lnRbVgA6ICTkPyk02

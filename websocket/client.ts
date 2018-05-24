@@ -1,14 +1,4 @@
-// Copyright 2017 Gerasimos Maropoulos, ΓΜ. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-// -------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------
-// ----------------Client side websocket commented typescript source code --------------
-// -------------------------------------------------------------------------------------
-// -------------------------------------------------------------------------------------
-
-// export to client.go:clientSource []byte
+// export to client.go:ClientSource []byte
 
 const websocketStringMessageType = 0;
 const websocketIntMessageType = 1;
@@ -116,15 +106,16 @@ class Ws {
             //propably json-object
             t = websocketJSONMessageType;
             m = JSON.stringify(data);
-        } else {
-            console.log("Invalid, javascript-side should contains an empty second parameter.");
+        } else if (data !== null && typeof (data) !== "undefined") {
+            // if it has a second parameter but it's not a type we know, then fire this:
+            console.log("unsupported type of input argument passed, try to not include this argument to the 'Emit'");
         }
 
         return this._msg(event, t, m);
     }
 
     private decodeMessage<T>(event: string, websocketMessage: string): T | any {
-        //q-websocket-message;user;4;themarshaledstringfromajsonstruct
+        //iris-websocket-message;user;4;themarshaledstringfromajsonstruct
         let skipLen = websocketMessagePrefixLen + websocketMessageSeparatorLen + event.length + 2;
         if (websocketMessage.length < skipLen + 1) {
             return null;
@@ -169,7 +160,7 @@ class Ws {
     // if native message then calls the fireNativeMessage
     // else calls the fireMessage
     //
-    // remember q gives you the freedom of native websocket messages if you don't want to use this client side at all.
+    // remember iris gives you the freedom of native websocket messages if you don't want to use this client side at all.
     private messageReceivedFromConn(evt: MessageEvent): void {
         //check if qws message
         let message = <string>evt.data;
@@ -252,7 +243,7 @@ class Ws {
         this.conn.send(websocketMessage);
     }
 
-    // Emit sends an q-custom websocket message
+    // Emit sends an iris-custom websocket message
     Emit(event: string, data: any): void {
         let messageStr = this.encodeMessage(event, data);
         this.EmitMessage(messageStr);

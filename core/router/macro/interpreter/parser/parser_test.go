@@ -1,7 +1,3 @@
-// Copyright 2017 Gerasimos Maropoulos. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package parser
 
 import (
@@ -64,6 +60,7 @@ func TestParseParam(t *testing.T) {
 				},
 				ErrorCode: 404,
 			}}, // 0
+
 		{true,
 			ast.ParamStatement{
 				Src:  "{id:int range(1,5)}",
@@ -127,6 +124,20 @@ func TestParseParam(t *testing.T) {
 				},
 				ErrorCode: 404,
 			}}, // 7
+		{true,
+			ast.ParamStatement{
+				Src:       "{id:long else 404}",
+				Name:      "id",
+				Type:      ast.ParamTypeLong,
+				ErrorCode: 404,
+			}}, // 8
+		{true,
+			ast.ParamStatement{
+				Src:       "{has:boolean else 404}",
+				Name:      "has",
+				Type:      ast.ParamTypeBoolean,
+				ErrorCode: 404,
+			}}, // 9
 
 	}
 

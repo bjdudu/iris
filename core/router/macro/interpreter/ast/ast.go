@@ -1,11 +1,8 @@
-// Copyright 2017 Gerasimos Maropoulos. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package ast
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 )
 
@@ -22,9 +19,18 @@ const (
 	// Declaration: /mypath/{myparam:string} or /mypath{myparam}
 	ParamTypeString
 	// ParamTypeInt is the integer, a number type.
-	// Allows only numbers (0-9)
+	// Allows only positive numbers (0-9)
 	// Declaration: /mypath/{myparam:int}
 	ParamTypeInt
+	// ParamTypeLong is the integer, a number type.
+	// Allows only positive numbers (0-9)
+	// Declaration: /mypath/{myparam:long}
+	ParamTypeLong
+	// ParamTypeBoolean is the bool type.
+	// Allows only "1" or "t" or "T" or "TRUE" or "true" or "True"
+	// or "0" or "f" or "F" or "FALSE" or "false" or "False".
+	// Declaration: /mypath/{myparam:boolean}
+	ParamTypeBoolean
 	// ParamTypeAlphabetical is the  alphabetical/letter type type.
 	// Allows letters only (upper or lowercase)
 	// Declaration:  /mypath/{myparam:alphabetical}
@@ -45,9 +51,72 @@ const (
 	ParamTypePath
 )
 
+func (pt ParamType) String() string {
+	for k, v := range paramTypes {
+		if v == pt {
+			return k
+		}
+	}
+
+	return "unexpected"
+}
+
+// Not because for a single reason
+// a string may be a
+// ParamTypeString or a ParamTypeFile
+// or a ParamTypePath or ParamTypeAlphabetical.
+//
+// func ParamTypeFromStd(k reflect.Kind) ParamType {
+
+// Kind returns the std kind of this param type.
+func (pt ParamType) Kind() reflect.Kind {
+	switch pt {
+	case ParamTypeAlphabetical:
+		fallthrough
+	case ParamTypeFile:
+		fallthrough
+	case ParamTypePath:
+		fallthrough
+	case ParamTypeString:
+		return reflect.String
+	case ParamTypeInt:
+		return reflect.Int
+	case ParamTypeLong:
+		return reflect.Int64
+	case ParamTypeBoolean:
+		return reflect.Bool
+	}
+	return reflect.Invalid // 0
+}
+
+// ValidKind will return true if at least one param type is supported
+// for this std kind.
+func ValidKind(k reflect.Kind) bool {
+	switch k {
+	case reflect.String:
+		fallthrough
+	case reflect.Int:
+		fallthrough
+	case reflect.Int64:
+		fallthrough
+	case reflect.Bool:
+		return true
+	default:
+		return false
+	}
+}
+
+// Assignable returns true if the "k" standard type
+// is assignabled to this ParamType.
+func (pt ParamType) Assignable(k reflect.Kind) bool {
+	return pt.Kind() == k
+}
+
 var paramTypes = map[string]ParamType{
 	"string":       ParamTypeString,
 	"int":          ParamTypeInt,
+	"long":         ParamTypeLong,
+	"boolean":      ParamTypeBoolean,
 	"alphabetical": ParamTypeAlphabetical,
 	"file":         ParamTypeFile,
 	"path":         ParamTypePath,
@@ -63,6 +132,7 @@ var paramTypes = map[string]ParamType{
 // Available:
 // "string"
 // "int"
+// "long"
 // "alphabetical"
 // "file"
 // "path"
@@ -71,6 +141,30 @@ func LookupParamType(ident string) ParamType {
 		return typ
 	}
 	return ParamTypeUnExpected
+}
+
+// LookupParamTypeFromStd accepts the string representation of a standard go type.
+// It returns a ParamType, but it may differs for example
+// the alphabetical, file, path and string are all string go types, so
+// make sure that caller resolves these types before this call.
+//
+// string matches to string
+// int matches to int
+// int64 matches to long
+// bool matches to boolean
+func LookupParamTypeFromStd(goType string) ParamType {
+	switch goType {
+	case "string":
+		return ParamTypeString
+	case "int":
+		return ParamTypeInt
+	case "int64":
+		return ParamTypeLong
+	case "bool":
+		return ParamTypeBoolean
+	default:
+		return ParamTypeUnExpected
+	}
 }
 
 // ParamStatement is a struct
